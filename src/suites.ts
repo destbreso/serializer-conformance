@@ -189,8 +189,20 @@ function nest(depth: number): unknown {
  * Engine stack limits move between runs and machines, so the number is an
  * order of magnitude and reported as such. `ceiling` caps the probe; a subject
  * that reaches it is iterative and effectively unbounded.
+ *
+ * The ceiling arrives in an options object rather than as a second positional
+ * argument, and that is a scar. `subjects.map(runDepth)` passes the array index
+ * as the second argument, so the first subject got a ceiling of 0, probed depth
+ * 0, succeeded, and was reported as unbounded. Every subject in the field came
+ * out "unbounded" in a published chart. An options object makes the mistake
+ * inert: a stray number has no `ceiling` property, so the default applies.
+ * An explicitly bad ceiling now throws rather than quietly certifying nothing.
  */
-export function runDepth(subject: Subject, ceiling = 200_000): DepthResult {
+export function runDepth(subject: Subject, options: { ceiling?: number } = {}): DepthResult {
+  const ceiling = options.ceiling ?? 200_000;
+  if (!Number.isSafeInteger(ceiling) || ceiling < 2) {
+    throw new RangeError(`runDepth ceiling must be an integer >= 2, got ${ceiling}`);
+  }
   const works = (d: number): boolean => {
     try {
       subject.run(nest(d));

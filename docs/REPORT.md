@@ -213,42 +213,42 @@ Surviving deep input by taking thirty seconds over it is not surviving it.
 A quadratic kernel is a denial of service that moved from the call stack to
 the clock, and this suite is where that shows up.
 
-| implementation             | depth exp.    | depth       | width exp.    | width  | notes |
-| -------------------------- | ------------- | ----------- | ------------- | ------ | ----- |
-| canonicalize               | 1.01 (r²1.00) | linear      | 1.15 (r²0.99) | linear |       |
-| json-canonicalize          | 0.76 (r²0.96) | linear      | 1.13 (r²1.00) | linear |       |
-| safe-stable-stringify      | 1.27 (r²1.00) | superlinear | 1.05 (r²0.99) | linear |       |
-| fast-json-stable-stringify | 1.02 (r²0.99) | linear      | 1.16 (r²1.00) | linear |       |
-| ohash.serialize            | 1.00 (r²1.00) | linear      | 1.15 (r²1.00) | linear |       |
-| ohash.hash                 | 0.99 (r²1.00) | linear      | 1.14 (r²1.00) | linear |       |
-| stable-hash                | 1.05 (r²1.00) | linear      | 1.20 (r²1.00) | linear |       |
-| object-hash                | 0.88 (r²0.98) | linear      | 1.06 (r²1.00) | linear |       |
+| implementation             | depth exp.    | depth              | width exp.    | width       | notes |
+| -------------------------- | ------------- | ------------------ | ------------- | ----------- | ----- |
+| canonicalize               | 0.97 (r²1.00) | linear             | 1.14 (r²1.00) | linear      |       |
+| json-canonicalize          | 0.77 (r²0.97) | linear             | 1.15 (r²1.00) | linear      |       |
+| safe-stable-stringify      | 1.21 (r²1.00) | superlinear        | 1.10 (r²1.00) | linear      |       |
+| fast-json-stable-stringify | 1.04 (r²1.00) | linear             | 1.20 (r²1.00) | superlinear |       |
+| ohash.serialize            | 0.97 (r²1.00) | linear             | 1.12 (r²1.00) | linear      |       |
+| ohash.hash                 | 1.04 (r²0.78) | no clean power law | 1.15 (r²0.99) | linear      |       |
+| stable-hash                | 1.04 (r²1.00) | linear             | 1.24 (r²1.00) | superlinear |       |
+| object-hash                | 0.92 (r²0.99) | linear             | 1.04 (r²1.00) | linear      |       |
 
 ### Milliseconds by depth
 
 | implementation             | 64   | 128  | 256  | 512  | 1,024 |
 | -------------------------- | ---- | ---- | ---- | ---- | ----- |
 | canonicalize               | 0.01 | 0.02 | 0.04 | 0.07 | 0.14  |
-| json-canonicalize          | 0.02 | 0.03 | 0.06 | 0.10 | 0.12  |
+| json-canonicalize          | 0.02 | 0.03 | 0.06 | 0.10 | 0.13  |
 | safe-stable-stringify      | 0.00 | 0.01 | 0.02 | 0.05 | 0.14  |
-| fast-json-stable-stringify | 0.01 | 0.02 | 0.05 | 0.10 | 0.16  |
-| ohash.serialize            | 0.01 | 0.01 | 0.02 | 0.05 | 0.09  |
-| ohash.hash                 | 0.01 | 0.01 | 0.03 | 0.05 | 0.10  |
-| stable-hash                | 0.01 | 0.02 | 0.03 | 0.07 | 0.14  |
-| object-hash                | 0.29 | 0.38 | 0.76 | 1.53 | 3.08  |
+| fast-json-stable-stringify | 0.01 | 0.03 | 0.05 | 0.10 | 0.21  |
+| ohash.serialize            | 0.01 | 0.01 | 0.03 | 0.05 | 0.10  |
+| ohash.hash                 | 0.01 | 0.07 | 0.03 | 0.20 | 0.25  |
+| stable-hash                | 0.01 | 0.02 | 0.04 | 0.07 | 0.15  |
+| object-hash                | 0.25 | 0.39 | 0.81 | 1.56 | 3.00  |
 
 ### Milliseconds by width
 
 | implementation             | 500  | 1,000 | 2,000 | 4,000 | 8,000 |
 | -------------------------- | ---- | ----- | ----- | ----- | ----- |
-| canonicalize               | 0.10 | 0.19  | 0.43  | 1.18  | 2.13  |
-| json-canonicalize          | 0.09 | 0.17  | 0.44  | 0.93  | 1.91  |
-| safe-stable-stringify      | 0.08 | 0.18  | 0.30  | 0.81  | 1.51  |
-| fast-json-stable-stringify | 0.06 | 0.14  | 0.33  | 0.74  | 1.54  |
-| ohash.serialize            | 0.11 | 0.25  | 0.60  | 1.29  | 2.65  |
-| ohash.hash                 | 0.12 | 0.25  | 0.59  | 1.30  | 2.67  |
-| stable-hash                | 0.06 | 0.12  | 0.29  | 0.68  | 1.47  |
-| object-hash                | 0.26 | 0.49  | 1.11  | 2.41  | 4.55  |
+| canonicalize               | 0.10 | 0.19  | 0.42  | 0.94  | 2.23  |
+| json-canonicalize          | 0.09 | 0.19  | 0.40  | 1.06  | 1.95  |
+| safe-stable-stringify      | 0.08 | 0.17  | 0.35  | 0.89  | 1.62  |
+| fast-json-stable-stringify | 0.06 | 0.14  | 0.40  | 0.80  | 1.76  |
+| ohash.serialize            | 0.13 | 0.33  | 0.64  | 1.47  | 2.90  |
+| ohash.hash                 | 0.12 | 0.30  | 0.71  | 1.71  | 2.74  |
+| stable-hash                | 0.06 | 0.13  | 0.31  | 0.80  | 1.64  |
+| object-hash                | 0.27 | 0.50  | 1.10  | 2.34  | 4.70  |
 
 ### Output length at 8,000 keys
 

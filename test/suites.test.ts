@@ -16,7 +16,7 @@ import {
   runScaling,
   DEPTH_SIZES,
 } from "../src/suites.js";
-import type { Subject } from "../src/types.js";
+import type { DepthResult, Subject } from "../src/types.js";
 
 /** A deliberately naive JSON-subset canonicalizer, correct enough to pass. */
 const naiveJcs: Subject = {
@@ -244,35 +244,62 @@ describe("depth", () => {
   }
 
   it("finds an exact known limit", () => {
-    expect(runDepth(limitedTo(1_234), 100_000).maxDepth).toBe(1_234);
+    expect(runDepth(limitedTo(1_234), { ceiling: 100_000 }).maxDepth).toBe(1_234);
   });
 
   it("finds a limit that is an exact power of two", () => {
     // The exponential phase lands directly on the answer here, which is the
     // case most likely to be off by one.
-    expect(runDepth(limitedTo(1_024), 100_000).maxDepth).toBe(1_024);
+    expect(runDepth(limitedTo(1_024), { ceiling: 100_000 }).maxDepth).toBe(1_024);
   });
 
   it("reports the failure mode", () => {
-    const r = runDepth(limitedTo(500), 100_000);
+    const r = runDepth(limitedTo(500), { ceiling: 100_000 });
     expect(r.failureMode).toMatch(/RangeError/);
   });
 
   it("reports unbounded only when the ceiling itself was handled", () => {
     const constant: Subject = { name: "constant", kind: "hash", run: () => "c" };
-    expect(runDepth(constant, 4_096).maxDepth).toBe(Infinity);
+    expect(runDepth(constant, { ceiling: 4_096 }).maxDepth).toBe(Infinity);
   });
 
   it("does not call a limit below the ceiling unbounded", () => {
     // Guards the overshoot bug: doubling past the ceiling must not be mistaken
     // for having survived it. 3000 is deliberately not a power of two and sits
     // between 2048 and 4096, so a clamping mistake surfaces here.
-    expect(runDepth(limitedTo(3_000), 4_096).maxDepth).toBe(3_000);
+    expect(runDepth(limitedTo(3_000), { ceiling: 4_096 }).maxDepth).toBe(3_000);
   });
 
   it("reports 0 when the subject cannot handle even depth 1", () => {
     const useless: Subject = { name: "useless", kind: "hash", run: () => { throw new Error("no"); } };
-    expect(runDepth(useless, 1_000).maxDepth).toBe(0);
+    expect(runDepth(useless, { ceiling: 1_000 }).maxDepth).toBe(0);
+  });
+
+  it("survives being passed straight to Array.map", () => {
+    // The bug this guards. `subjects.map(runDepth)` hands the array index in as
+    // the second argument. With a positional ceiling the first subject got 0,
+    // probed depth 0, succeeded and was reported unbounded, and a published
+    // chart showed every implementation in the field as having no limit. An
+    // options object makes a stray number inert.
+    // TypeScript now rejects `map(runDepth)` outright: a number has no
+    // properties in common with the options type. That is the better half of
+    // the fix. The cast below reproduces what a plain-JS caller does, where no
+    // compiler objects, and asserts the runtime is safe there too.
+    const subjects = [limitedTo(1_024), limitedTo(2_048), limitedTo(512)];
+    const asPlainJsCalls = runDepth as unknown as (s: Subject, i: number) => DepthResult;
+    const viaMap = subjects.map(asPlainJsCalls);
+    const explicit = subjects.map((s) => runDepth(s));
+
+    expect(viaMap.map((r) => r.maxDepth)).toEqual(explicit.map((r) => r.maxDepth));
+    expect(viaMap.every((r) => r.maxDepth !== Infinity)).toBe(true);
+  });
+
+  it("refuses a ceiling that could only certify nothing", () => {
+    // Silently accepting a ceiling of 0 and answering "unbounded" is exactly
+    // the silent-wrong-answer failure this harness exists to catch.
+    for (const ceiling of [0, 1, -5, 2.5, NaN]) {
+      expect(() => runDepth(limitedTo(100), { ceiling })).toThrow(RangeError);
+    }
   });
 });
 

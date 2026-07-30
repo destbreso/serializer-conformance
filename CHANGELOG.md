@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## 0.4.0
+
+**Breaking:** `runDepth(subject, ceiling)` becomes
+`runDepth(subject, { ceiling })`.
+
+The positional form was a trap, and it sprang. `subjects.map(runDepth)` reads
+perfectly and is wrong, because `Array.map` supplies `(element, index, array)`:
+the array index arrives as the ceiling, so the first subject is probed to depth
+0, succeeds, and is reported as unbounded. A consumer hit exactly this and
+published a chart showing every implementation in the field as having no depth
+limit, directly above a table giving their real ceilings.
+
+An options object makes the mistake inert, because a number has no `ceiling`
+property and the default applies. In TypeScript it is better than inert: the
+call no longer compiles, since a number has no properties in common with the
+options type. An explicitly bad ceiling now throws a `RangeError` instead of
+quietly certifying a depth that was never tried.
+
+Migration is mechanical: `runDepth(s, 4096)` becomes
+`runDepth(s, { ceiling: 4096 })`. The common call, `runDepth(s)`, is unchanged.
+
 ## 0.3.0
 
 - **New `scaling` suite.** Fits log(time) against log(size) on two axes, depth

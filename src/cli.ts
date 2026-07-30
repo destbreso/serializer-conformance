@@ -64,7 +64,7 @@ function progress(message: string): void {
 const main = defineCommand({
   meta: {
     name: "serializer-conformance",
-    version: "0.3.0",
+    version: "0.4.0",
     description:
       "Conformance and collision harness for JavaScript value serializers: JSON canonicalizers and " +
       "structural hashers. Measures whatever supported packages are installed: nothing is bundled, " +
