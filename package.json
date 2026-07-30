@@ -1,0 +1,77 @@
+{
+  "name": "canon-arena",
+  "version": "0.1.0",
+  "description": "A conformance and collision harness for JavaScript JSON canonicalizers and structural hashers: byte-exact RFC 8785 (JCS) conformance against the official test vectors, a differential type-coverage matrix over the whole JavaScript value graph, and a collision detector that catches distinct inputs producing identical output. Adapters for the popular npm packages, and bring-your-own.",
+  "author": {
+    "name": "David Estevez",
+    "email": "dev.destbreso@gmail.com"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "canon-arena": "./dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "canonicalization",
+    "canonical-json",
+    "jcs",
+    "rfc8785",
+    "conformance",
+    "test-vectors",
+    "harness",
+    "benchmark",
+    "structural-hash",
+    "content-hash",
+    "content-addressing",
+    "collision",
+    "differential-testing",
+    "deterministic",
+    "stable-stringify",
+    "cli",
+    "typescript"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "canonicalize": "^3.0.0",
+    "fast-json-stable-stringify": "^2.1.0",
+    "json-canonicalize": "^2.0.0",
+    "object-hash": "^3.0.0",
+    "ohash": "^2.0.11",
+    "safe-stable-stringify": "^2.5.0",
+    "stable-hash": "^0.0.6",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "citty": "^0.2.2",
+    "picocolors": "^1.1.1"
+  }
+}
