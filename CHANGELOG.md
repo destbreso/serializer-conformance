@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.0
+
+- **New `scaling` suite.** Fits log(time) against log(size) on two axes, depth
+  and width, and reports the exponent with its r²: 1 is linear, 2 is quadratic.
+  The depth suite only answers whether a subject crashes, and a canonicalizer
+  that survives deep input by taking thirty seconds over it has moved the denial
+  of service from the call stack to the clock. Output length is reported too,
+  because unlike a duration it is exactly reproducible. It reports the shape
+  rather than a winner: absolute throughput would rank unlike things, since a
+  hasher does strictly more work than a serializer.
+- `scaling-depth.svg` and `scaling-width.svg` join the `--svg` output. Bars for
+  a poor fit are hollow, so an exponent that should not be read as a
+  measurement does not look like one.
+- **Fixed: charts were unreadable on npm.** They carried a
+  `prefers-color-scheme` block, and an SVG embedded with `<img>` resolves that
+  against the viewer's operating system rather than the page it is on. npm
+  renders READMEs on white, so anyone browsing with a dark OS got the dark
+  palette on a white page: pale grey labels, no contrast, inconsistent with
+  every other image around them. Charts now use one fixed palette and paint
+  their own background, so they render identically everywhere. Text colours are
+  asserted against WCAG AA in the tests instead of eyeballed.
+
 ## 0.2.0
 
 - **`--svg <dir>`**: writes SVG charts for the two suites whose results are

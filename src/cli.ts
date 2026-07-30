@@ -17,13 +17,14 @@ import { defineCommand, runMain } from "citty";
 import pc from "picocolors";
 
 import { builtinSubjects } from "./adapters.js";
-import { collisionChart, depthChart } from "./charts.js";
+import { collisionChart, depthChart, scalingChart } from "./charts.js";
 import {
   runCollisions,
   runConformance,
   runCoverage,
   runDepth,
   runDeterminism,
+  runScaling,
 } from "./suites.js";
 import {
   reportCollisions,
@@ -32,10 +33,11 @@ import {
   reportDepth,
   reportDeterminism,
   reportHeader,
+  reportScaling,
 } from "./report.js";
 import type { Subject } from "./types.js";
 
-const SUITES = ["conformance", "collisions", "determinism", "coverage", "depth"] as const;
+const SUITES = ["conformance", "collisions", "determinism", "coverage", "depth", "scaling"] as const;
 type SuiteName = (typeof SUITES)[number];
 const DEFAULT_SUITES: SuiteName[] = ["conformance", "collisions", "determinism"];
 
@@ -62,7 +64,7 @@ function progress(message: string): void {
 const main = defineCommand({
   meta: {
     name: "serializer-conformance",
-    version: "0.2.0",
+    version: "0.3.0",
     description:
       "Conformance and collision harness for JavaScript value serializers: JSON canonicalizers and " +
       "structural hashers. Measures whatever supported packages are installed: nothing is bundled, " +
@@ -85,7 +87,7 @@ const main = defineCommand({
     svg: {
       type: "string",
       description:
-        "also write SVG charts for the collision and depth suites into this directory",
+        "also write SVG charts (collision grid, depth, scaling) into this directory",
     },
   },
   async run({ args }) {
@@ -183,6 +185,15 @@ const main = defineCommand({
       const results = subjects.map((s) => runDepth(s));
       out += reportDepth(results) + "\n";
       if (svgDir) writeChart("depth.svg", depthChart(results));
+    }
+    if (suites.includes("scaling")) {
+      progress("measuring how cost grows with size (timed, this one is slow)");
+      const results = subjects.map(runScaling);
+      out += reportScaling(results) + "\n";
+      if (svgDir) {
+        writeChart("scaling-depth.svg", scalingChart(results, "depth"));
+        writeChart("scaling-width.svg", scalingChart(results, "width"));
+      }
     }
 
     process.stdout.write(colourize(out));

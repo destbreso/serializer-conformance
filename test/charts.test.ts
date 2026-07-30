@@ -5,7 +5,7 @@
 // file people commit to a README.
 
 import { describe, expect, it } from "vitest";
-import { collisionChart, depthChart } from "../src/charts.js";
+import { CHART_PALETTE, collisionChart, depthChart, scalingChart } from "../src/charts.js";
 import { COLLISION_PROBES } from "../src/cases.js";
 import type { CollisionResult, DepthResult } from "../src/types.js";
 
@@ -45,24 +45,43 @@ function assertSelfContained(out: string): void {
   expect((out.match(/<svg/g) ?? []).length).toBe((out.match(/<\/svg>/g) ?? []).length);
 }
 
+/** WCAG relative luminance of an #rrggbb colour. */
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const [l1, l2] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
 /**
- * Every themed class an element uses must have a dark-mode rule, or that
- * element keeps its light colour on a dark background and becomes invisible.
- * Checked structurally so adding a class later cannot quietly skip the theme.
+ * The chart must paint its own surface before anything else. Without it the
+ * figure inherits the host page's background, and a README image has no idea
+ * what that is: npm is white, GitHub in dark mode is not, and a chart that
+ * assumes either one is illegible on the other.
  */
-function assertDarkThemeIsComplete(out: string): void {
-  const dark = /@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n  \}/.exec(out);
-  expect(dark, "no dark-scheme block").not.toBeNull();
+function assertPaintsItsOwnSurface(out: string): void {
+  const first = /<rect [^>]*>/.exec(out);
+  expect(first, "no background rect").not.toBeNull();
+  expect(first![0]).toContain(`fill="${CHART_PALETTE.bg}"`);
 
-  const used = new Set<string>();
-  for (const m of out.matchAll(/class="([^"]+)"/g)) {
-    for (const c of (m[1] ?? "").split(/\s+/)) if (c) used.add(c);
-  }
-  expect(used.size).toBeGreaterThan(0);
+  // And it must come before any content, or it covers what it should sit under.
+  expect(out.indexOf(first![0])).toBeLessThan(out.indexOf("<text"));
+}
 
-  for (const cls of used) {
-    expect(dark![1], `class ${cls} has no dark-mode rule`).toContain(`.${cls} {`);
-  }
+/**
+ * No theme-conditional colour. A prefers-color-scheme query inside an SVG
+ * embedded with <img> resolves against the viewer's OS rather than the page it
+ * is on, which is how dark-palette labels ended up on npm's white README.
+ */
+function assertNoConditionalTheming(out: string): void {
+  expect(out).not.toMatch(/prefers-color-scheme/);
+  expect(out).not.toMatch(/var\(--/);
 }
 
 describe("collisionChart", () => {
@@ -75,13 +94,16 @@ describe("collisionChart", () => {
     assertSelfContained(collisionChart(results));
   });
 
-  it("themes every class it uses for dark mode", () => {
-    assertDarkThemeIsComplete(collisionChart(results));
+  it("paints its own surface and uses no conditional theming", () => {
+    assertPaintsItsOwnSurface(collisionChart(results));
+    assertNoConditionalTheming(collisionChart(results));
   });
 
   it("draws one cell per probe per subject", () => {
     const out = collisionChart(results);
-    const cells = (out.match(/<rect x="\d+(\.\d+)?" y="\d+(\.\d+)?" width="\d+"/g) ?? []).length;
+    // Cells are the rx="3" rects. The surface rect uses rx="6", so counting all
+    // rects would silently include it.
+    const cells = (out.match(/<rect [^>]*rx="3"/g) ?? []).length;
     expect(cells).toBe(COLLISION_PROBES.length * results.length);
   });
 
@@ -157,8 +179,9 @@ describe("depthChart", () => {
     assertSelfContained(depthChart(results));
   });
 
-  it("themes every class it uses for dark mode", () => {
-    assertDarkThemeIsComplete(depthChart(results));
+  it("paints its own surface and uses no conditional theming", () => {
+    assertPaintsItsOwnSurface(depthChart(results));
+    assertNoConditionalTheming(depthChart(results));
   });
 
   it("labels finite results with the measured number", () => {
@@ -194,5 +217,117 @@ describe("depthChart", () => {
     const out = depthChart([{ subject: "<b>&", maxDepth: 10 }]);
     expect(out).not.toContain("<b>");
     expect(out).toContain("&lt;b&gt;");
+  });
+});
+
+describe("palette", () => {
+  const P = CHART_PALETTE;
+
+  it("clears WCAG AA for every colour that carries text", () => {
+    // 4.5:1 is the AA threshold for normal-size text. These labels run down to
+    // 10px, so anything below it is not a stylistic preference, it is a label
+    // the reader cannot make out. The previous muted grey (#6b7280) sat at 4.8
+    // and still read as washed out at that size.
+    const onSurface: Array<[string, string]> = [
+      ["fg", P.fg],
+      ["muted", P.muted],
+      ["ok", P.ok],
+      ["bad", P.bad],
+      ["refused", P.refused],
+      ["bar", P.bar],
+      ["accent", P.accent],
+    ];
+    for (const [name, colour] of onSurface) {
+      expect(contrast(colour, P.bg), `${name} on bg`).toBeGreaterThanOrEqual(4.5);
+    }
+
+    // Cell glyphs sit on their own tinted backgrounds, not on the surface.
+    const inCells: Array<[string, string, string]> = [
+      ["ok", P.ok, P.okBg],
+      ["bad", P.bad, P.badBg],
+      ["refused", P.refused, P.refusedBg],
+    ];
+    for (const [name, fg, bg] of inCells) {
+      expect(contrast(fg, bg), `${name} in cell`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps the cell tints distinguishable from the surface", () => {
+    // Too close to the background and the grid stops reading as a grid.
+    for (const tint of [P.okBg, P.badBg, P.refusedBg]) {
+      expect(contrast(tint, P.bg)).toBeGreaterThan(1.05);
+    }
+  });
+});
+
+describe("scalingChart", () => {
+  const results = [
+    {
+      subject: "linear-ish",
+      series: [
+        { axis: "depth" as const, points: [{ n: 64, ms: 1, outputLength: 10 }], exponent: 1.02, rSquared: 0.99 },
+        { axis: "width" as const, points: [{ n: 500, ms: 1, outputLength: 10 }], exponent: 1.05, rSquared: 0.98 },
+      ],
+    },
+    {
+      subject: "quadratic",
+      series: [
+        { axis: "depth" as const, points: [{ n: 64, ms: 4, outputLength: 10 }], exponent: 1.98, rSquared: 0.99 },
+        { axis: "width" as const, points: [{ n: 500, ms: 4, outputLength: 10 }], exponent: 2.01, rSquared: 0.99 },
+      ],
+    },
+    {
+      subject: "noisy",
+      series: [
+        { axis: "depth" as const, points: [{ n: 64, ms: 1, outputLength: 10 }], exponent: 1.4, rSquared: 0.2 },
+      ],
+    },
+    { subject: "unmeasured", series: [] },
+  ];
+
+  it("is a self-contained svg that paints its own surface", () => {
+    const out = scalingChart(results);
+    assertSelfContained(out);
+    assertPaintsItsOwnSurface(out);
+    assertNoConditionalTheming(out);
+  });
+
+  it("marks a poor fit as such instead of quoting it like a measurement", () => {
+    const out = scalingChart(results);
+    expect(out).toContain("poor fit");
+    // A hollow bar: stroked, not filled.
+    expect(out).toMatch(/<rect [^>]*fill="none"[^>]*stroke=/);
+  });
+
+  it("says so when an axis was never measured", () => {
+    expect(scalingChart(results)).toContain("not measured");
+  });
+
+  it("colours quadratic growth as the finding and linear as ordinary", () => {
+    const out = scalingChart(results);
+    expect(out).toContain(CHART_PALETTE.bad);
+    expect(out).toContain(CHART_PALETTE.bar);
+  });
+
+  it("renders either axis", () => {
+    expect(scalingChart(results, "width")).toContain("by width");
+    expect(scalingChart(results, "depth")).toContain("by depth");
+  });
+
+  it("clamps an off-scale exponent instead of drawing past the axis", () => {
+    const wild = [
+      {
+        subject: "cubic",
+        series: [
+          { axis: "depth" as const, points: [{ n: 64, ms: 1, outputLength: 1 }], exponent: 3.4, rSquared: 0.99 },
+        ],
+      },
+    ];
+    const out = scalingChart(wild);
+    const width = Number(/width="(\d+)"/.exec(out)![1]);
+    for (const m of out.matchAll(/<rect [^>]*x="([\d.]+)"[^>]*width="([\d.]+)"/g)) {
+      expect(Number(m[1]) + Number(m[2])).toBeLessThanOrEqual(width);
+    }
+    expect(out).toContain("3.40+");
   });
 });

@@ -120,6 +120,38 @@ export interface CoverageResult {
   cells: ReadonlyArray<{ case: string; outcome: Outcome }>;
 }
 
+/** One measured point on a scaling curve. */
+export interface ScalingPoint {
+  /** Input size: nesting levels for the depth axis, entries for the width axis. */
+  n: number;
+  /** Median of several timed repetitions, in milliseconds. */
+  ms: number;
+  /** Length of the produced string, which is a cost of its own downstream. */
+  outputLength: number;
+}
+
+/**
+ * How cost grows along one axis.
+ *
+ * `exponent` is the slope of log(time) against log(size), so 1 is linear and 2
+ * is quadratic. It is a fit over a handful of noisy points, which is why
+ * `rSquared` travels with it: a low r-squared means the cost is not a clean
+ * power law and the exponent should not be quoted on its own.
+ */
+export interface ScalingSeries {
+  axis: "depth" | "width";
+  points: ReadonlyArray<ScalingPoint>;
+  exponent: number;
+  rSquared: number;
+  /** Set when the subject threw partway up the series, e.g. a stack overflow. */
+  failedAt?: number;
+}
+
+export interface ScalingResult {
+  subject: string;
+  series: ReadonlyArray<ScalingSeries>;
+}
+
 export interface DepthResult {
   subject: string;
   /**

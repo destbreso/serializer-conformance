@@ -194,6 +194,77 @@ reached without failing, which is the signature of an iterative kernel.
 | fast-json-stable-stringify | 5,883     |                                              |
 | ohash.serialize            | 1,535     |                                              |
 | ohash.hash                 | 4,809     |                                              |
-| stable-hash                | 7,566     |                                              |
+| stable-hash                | 7,565     |                                              |
 | object-hash                | 4,807     |                                              |
+
+## Scaling
+
+How cost grows with input size. The exponent is the slope of log(time)
+against log(size), so 1 is linear and 2 is quadratic, and r² says how well
+the points actually fit a power law: a low r² means the exponent should not
+be quoted on its own.
+
+This measures the *shape*, not a winner. Absolute throughput across these
+subjects would compare unlike things, because a hasher does strictly more
+work than a serializer: it also hashes. The exponent is comparable in a way
+the constant is not.
+
+Surviving deep input by taking thirty seconds over it is not surviving it.
+A quadratic kernel is a denial of service that moved from the call stack to
+the clock, and this suite is where that shows up.
+
+| implementation             | depth exp.    | depth       | width exp.    | width  | notes |
+| -------------------------- | ------------- | ----------- | ------------- | ------ | ----- |
+| canonicalize               | 1.01 (r²1.00) | linear      | 1.15 (r²0.99) | linear |       |
+| json-canonicalize          | 0.76 (r²0.96) | linear      | 1.13 (r²1.00) | linear |       |
+| safe-stable-stringify      | 1.27 (r²1.00) | superlinear | 1.05 (r²0.99) | linear |       |
+| fast-json-stable-stringify | 1.02 (r²0.99) | linear      | 1.16 (r²1.00) | linear |       |
+| ohash.serialize            | 1.00 (r²1.00) | linear      | 1.15 (r²1.00) | linear |       |
+| ohash.hash                 | 0.99 (r²1.00) | linear      | 1.14 (r²1.00) | linear |       |
+| stable-hash                | 1.05 (r²1.00) | linear      | 1.20 (r²1.00) | linear |       |
+| object-hash                | 0.88 (r²0.98) | linear      | 1.06 (r²1.00) | linear |       |
+
+### Milliseconds by depth
+
+| implementation             | 64   | 128  | 256  | 512  | 1,024 |
+| -------------------------- | ---- | ---- | ---- | ---- | ----- |
+| canonicalize               | 0.01 | 0.02 | 0.04 | 0.07 | 0.14  |
+| json-canonicalize          | 0.02 | 0.03 | 0.06 | 0.10 | 0.12  |
+| safe-stable-stringify      | 0.00 | 0.01 | 0.02 | 0.05 | 0.14  |
+| fast-json-stable-stringify | 0.01 | 0.02 | 0.05 | 0.10 | 0.16  |
+| ohash.serialize            | 0.01 | 0.01 | 0.02 | 0.05 | 0.09  |
+| ohash.hash                 | 0.01 | 0.01 | 0.03 | 0.05 | 0.10  |
+| stable-hash                | 0.01 | 0.02 | 0.03 | 0.07 | 0.14  |
+| object-hash                | 0.29 | 0.38 | 0.76 | 1.53 | 3.08  |
+
+### Milliseconds by width
+
+| implementation             | 500  | 1,000 | 2,000 | 4,000 | 8,000 |
+| -------------------------- | ---- | ----- | ----- | ----- | ----- |
+| canonicalize               | 0.10 | 0.19  | 0.43  | 1.18  | 2.13  |
+| json-canonicalize          | 0.09 | 0.17  | 0.44  | 0.93  | 1.91  |
+| safe-stable-stringify      | 0.08 | 0.18  | 0.30  | 0.81  | 1.51  |
+| fast-json-stable-stringify | 0.06 | 0.14  | 0.33  | 0.74  | 1.54  |
+| ohash.serialize            | 0.11 | 0.25  | 0.60  | 1.29  | 2.65  |
+| ohash.hash                 | 0.12 | 0.25  | 0.59  | 1.30  | 2.67  |
+| stable-hash                | 0.06 | 0.12  | 0.29  | 0.68  | 1.47  |
+| object-hash                | 0.26 | 0.49  | 1.11  | 2.41  | 4.55  |
+
+### Output length at 8,000 keys
+
+Deterministic, unlike the timings. A canonical form twice as long costs
+twice as much in the store it is written to and on the wire. A digest is
+constant-length by construction, which is a real advantage and not a
+better score at the same game.
+
+| implementation             | characters |
+| -------------------------- | ---------- |
+| canonicalize               | 101,781    |
+| json-canonicalize          | 101,781    |
+| safe-stable-stringify      | 101,781    |
+| fast-json-stable-stringify | 101,781    |
+| ohash.serialize            | 85,781     |
+| ohash.hash                 | 43         |
+| stable-hash                | 85,781     |
+| object-hash                | 40         |
 

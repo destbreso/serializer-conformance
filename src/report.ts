@@ -7,6 +7,8 @@ import type {
   ConformanceResult,
   CoverageResult,
   DepthResult,
+  ScalingResult,
+  ScalingSeries,
   Subject,
 } from "./types.js";
 import { COLLISION_PROBES } from "./cases.js";
@@ -162,4 +164,109 @@ export function reportHeader(subjects: ReadonlyArray<Subject>, missing: Readonly
     for (const s of noted) out += `- **${s.name}**: ${s.note}\n`;
   }
   return out + "\n";
+}
+
+/**
+ * Classification, deliberately coarse.
+ *
+ * Over the size range measured (a 16x spread) an n log n curve fits at roughly
+ * 1.1, which is not separable from linear given the noise in a handful of
+ * timings. So the bands are wide and the middle one is named for the ambiguity
+ * rather than pretending to resolve it. The exponent is printed alongside, so a
+ * reader who wants the number is not stuck with the label.
+ */
+function describeExponent(exponent: number, rSquared: number): string {
+  if (!Number.isFinite(exponent)) return "not measured";
+  if (rSquared < 0.85) return "no clean power law";
+  if (exponent < 1.2) return "linear";
+  if (exponent < 1.6) return "superlinear";
+  return "quadratic or worse";
+}
+
+export function reportScaling(results: ReadonlyArray<ScalingResult>): string {
+  const cell = (s?: ScalingSeries) => {
+    if (!s || !Number.isFinite(s.exponent)) return "n/a";
+    return `${s.exponent.toFixed(2)} (r²${s.rSquared.toFixed(2)})`;
+  };
+  const verdict = (s?: ScalingSeries) =>
+    s ? describeExponent(s.exponent, s.rSquared) : "not measured";
+
+  const rows = results.map((r) => {
+    const depth = r.series.find((s) => s.axis === "depth");
+    const width = r.series.find((s) => s.axis === "width");
+    const note = [depth, width]
+      .filter((s): s is ScalingSeries => Boolean(s?.failedAt))
+      .map((s) => `threw at ${s.axis} ${s.failedAt!.toLocaleString("en-US")}`)
+      .join("; ");
+    return [
+      r.subject,
+      cell(depth),
+      verdict(depth),
+      cell(width),
+      verdict(width),
+      note,
+    ];
+  });
+
+  let out = "## Scaling\n\n";
+  out += "How cost grows with input size. The exponent is the slope of log(time)\n";
+  out += "against log(size), so 1 is linear and 2 is quadratic, and r² says how well\n";
+  out += "the points actually fit a power law: a low r² means the exponent should not\n";
+  out += "be quoted on its own.\n\n";
+  out += "This measures the *shape*, not a winner. Absolute throughput across these\n";
+  out += "subjects would compare unlike things, because a hasher does strictly more\n";
+  out += "work than a serializer: it also hashes. The exponent is comparable in a way\n";
+  out += "the constant is not.\n\n";
+  out += "Surviving deep input by taking thirty seconds over it is not surviving it.\n";
+  out += "A quadratic kernel is a denial of service that moved from the call stack to\n";
+  out += "the clock, and this suite is where that shows up.\n\n";
+  out += table(
+    ["implementation", "depth exp.", "depth", "width exp.", "width", "notes"],
+    rows,
+  ) + "\n";
+
+  // The raw timings, so the fit above is checkable rather than trusted.
+  for (const axis of ["depth", "width"] as const) {
+    const sizes = results
+      .flatMap((r) => r.series.find((s) => s.axis === axis)?.points.map((p) => p.n) ?? [])
+      .filter((n, i, a) => a.indexOf(n) === i)
+      .sort((a, b) => a - b);
+    if (!sizes.length) continue;
+
+    out += `\n### Milliseconds by ${axis}\n\n`;
+    out += table(
+      ["implementation", ...sizes.map((n) => n.toLocaleString("en-US"))],
+      results.map((r) => {
+        const series = r.series.find((s) => s.axis === axis);
+        return [
+          r.subject,
+          ...sizes.map((n) => {
+            const p = series?.points.find((q) => q.n === n);
+            return p ? p.ms.toFixed(2) : "-";
+          }),
+        ];
+      }),
+    ) + "\n";
+  }
+
+  // Output length is a cost too, and unlike time it is exactly reproducible.
+  const widest = Math.max(
+    0,
+    ...results.flatMap((r) => r.series.find((s) => s.axis === "width")?.points.map((p) => p.n) ?? []),
+  );
+  if (widest > 0) {
+    out += `\n### Output length at ${widest.toLocaleString("en-US")} keys\n\n`;
+    out += "Deterministic, unlike the timings. A canonical form twice as long costs\n";
+    out += "twice as much in the store it is written to and on the wire. A digest is\n";
+    out += "constant-length by construction, which is a real advantage and not a\n";
+    out += "better score at the same game.\n\n";
+    out += table(
+      ["implementation", "characters"],
+      results.map((r) => {
+        const p = r.series.find((s) => s.axis === "width")?.points.find((q) => q.n === widest);
+        return [r.subject, p ? p.outputLength.toLocaleString("en-US") : "-"];
+      }),
+    ) + "\n";
+  }
+  return out;
 }

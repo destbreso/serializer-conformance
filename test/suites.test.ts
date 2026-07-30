@@ -13,6 +13,8 @@ import {
   runCoverage,
   runDepth,
   runDeterminism,
+  runScaling,
+  DEPTH_SIZES,
 } from "../src/suites.js";
 import type { Subject } from "../src/types.js";
 
@@ -271,5 +273,93 @@ describe("depth", () => {
   it("reports 0 when the subject cannot handle even depth 1", () => {
     const useless: Subject = { name: "useless", kind: "hash", run: () => { throw new Error("no"); } };
     expect(runDepth(useless, 1_000).maxDepth).toBe(0);
+  });
+});
+
+describe("scaling", () => {
+  /** Cost proportional to the work actually present in the value. */
+  const linear: Subject = {
+    name: "linear",
+    kind: "serializer",
+    run: (v) => JSON.stringify(v) ?? "",
+  };
+
+  it("reports linear work as an exponent near 1", () => {
+    const depth = runScaling(linear).series.find((s) => s.axis === "depth")!;
+    expect(depth.points.length).toBe(DEPTH_SIZES.length);
+    // Timing on a shared CI box is noisy, so the band is wide. It still
+    // separates linear from quadratic, which is all the suite claims to do.
+    expect(depth.exponent).toBeGreaterThan(0.5);
+    expect(depth.exponent).toBeLessThan(1.5);
+  });
+
+  it("is not fooled by a subject that memoizes on object identity", () => {
+    // The regression this exists for. Reusing one input per size let a WeakMap
+    // memoizer answer every timed repetition from cache, and the suite reported
+    // exponent 0.00 with a perfect fit: a confident-looking measurement of
+    // nothing. Each repetition now gets its own freshly built value.
+    const seen = new WeakMap<object, string>();
+    const memoizing: Subject = {
+      name: "memoizing",
+      kind: "hash",
+      run: (v) => {
+        if (typeof v === "object" && v !== null) {
+          const hit = seen.get(v);
+          if (hit !== undefined) return hit;
+          const out = JSON.stringify(v) ?? "";
+          seen.set(v, out);
+          return out;
+        }
+        return String(v);
+      },
+    };
+
+    const depth = runScaling(memoizing).series.find((s) => s.axis === "depth")!;
+    // A memoizer that never sees the same object twice does the full work every
+    // time, so its curve must look like the un-memoized one, not like a flat
+    // line at zero.
+    expect(depth.exponent).toBeGreaterThan(0.5);
+  });
+
+  it("records where a subject failed and fits only what it completed", () => {
+    const shallow: Subject = {
+      name: "shallow",
+      kind: "serializer",
+      run: (v) => {
+        let d = 0;
+        let cur: unknown = v;
+        while (cur && typeof cur === "object" && "a" in (cur as object)) {
+          cur = (cur as { a: unknown }).a;
+          if (++d > 200) throw new RangeError("too deep");
+        }
+        return String(d);
+      },
+    };
+
+    const depth = runScaling(shallow).series.find((s) => s.axis === "depth")!;
+    expect(depth.failedAt).toBeDefined();
+    expect(depth.points.every((p) => p.n < depth.failedAt!)).toBe(true);
+  });
+
+  it("refuses to fit fewer than three points", () => {
+    const brittle: Subject = {
+      name: "brittle",
+      kind: "serializer",
+      run: (v) => {
+        const s = JSON.stringify(v) ?? "";
+        if (s.length > 2_000) throw new Error("nope");
+        return s;
+      },
+    };
+    const depth = runScaling(brittle).series.find((s) => s.axis === "depth")!;
+    if (depth.points.length < 3) expect(Number.isNaN(depth.exponent)).toBe(true);
+  });
+
+  it("records output length, which is deterministic unlike the timings", () => {
+    const width = runScaling(linear).series.find((s) => s.axis === "width")!;
+    const lengths = width.points.map((p) => p.outputLength);
+    expect(lengths.every((l) => l > 0)).toBe(true);
+    // More keys, longer output. Monotone by construction for any real subject.
+    expect([...lengths].sort((a, b) => a - b)).toEqual(lengths);
   });
 });

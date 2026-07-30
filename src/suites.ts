@@ -1,4 +1,4 @@
-// The four suites. Each answers one question and refuses to answer any other.
+// The suites. Each answers one question and refuses to answer any other.
 
 import { CASES, CASES_BY_ID, COLLISION_PROBES } from "./cases.js";
 import { RFC8785_VECTORS } from "./vectors.js";
@@ -8,6 +8,9 @@ import type {
   CoverageResult,
   DepthResult,
   Outcome,
+  ScalingPoint,
+  ScalingResult,
+  ScalingSeries,
   Subject,
 } from "./types.js";
 
@@ -230,4 +233,150 @@ export function runDepth(subject: Subject, ceiling = 200_000): DepthResult {
   }
 
   return { subject: subject.name, maxDepth: lo, ...(failureMode ? { failureMode } : {}) };
+}
+
+// ------------------------------------------------------------------- scaling
+
+/**
+ * How cost grows with input size, along the two axes that matter.
+ *
+ * The depth suite next door answers "does it crash", and that is only half the
+ * availability question. A canonicalizer that survives deep input by taking
+ * thirty seconds over it has moved the denial of service from the call stack to
+ * the clock, which is the same outage and harder to diagnose because nothing in
+ * the logs says the word "error". This suite is the other half.
+ *
+ * It reports the *shape* rather than a winner. Absolute throughput across these
+ * subjects would be misleading: a hasher does strictly more work than a
+ * serializer because it also hashes, so ops/sec puts unlike things in one
+ * ranking. The exponent is comparable in a way the constant is not.
+ */
+
+/** A chain of `depth` nested objects. Exercises recursion and buffering. */
+function deepInput(depth: number): unknown {
+  let o: unknown = { leaf: 1 };
+  for (let i = 0; i < depth; i++) o = { a: o };
+  return o;
+}
+
+/** A flat object with `width` keys. Exercises key sorting and concatenation. */
+function wideInput(width: number): unknown {
+  const o: Record<string, number> = {};
+  // Keys are generated out of order so a subject that sorts actually sorts.
+  for (let i = 0; i < width; i++) o[`k${(i * 7919) % width}`] = i;
+  return o;
+}
+
+/**
+ * Median time to process each of a set of distinct inputs.
+ *
+ * Every repetition gets its *own* freshly built value, and that is the whole
+ * design. The first version reused one input and reported `stable-hash` as
+ * exponent 0.00 with a perfect fit, which is nonsense that looks authoritative:
+ * that library memoizes on object identity in a WeakMap, so the untimed warm-up
+ * call populated the cache and every timed repetition read it back. The suite
+ * was measuring the memo instead of the work.
+ *
+ * Inputs are built before the clock starts, so construction is never charged to
+ * the subject. Median rather than mean, because one GC pause drags a mean
+ * somewhere meaningless.
+ */
+function timeMedian(run: (value: unknown) => void, inputs: ReadonlyArray<unknown>): number {
+  const samples: number[] = [];
+  for (const value of inputs) {
+    const t0 = performance.now();
+    run(value);
+    samples.push(performance.now() - t0);
+  }
+  samples.sort((a, b) => a - b);
+  return samples[Math.floor(samples.length / 2)]!;
+}
+
+/** How many distinct inputs each size is timed over. */
+const REPS = 7;
+
+/**
+ * Least-squares fit of log(time) against log(size).
+ *
+ * The slope is the exponent: 1 is linear, 2 is quadratic. r-squared travels
+ * with it because a fit over five noisy points can produce a confident-looking
+ * exponent for something that is not a power law at all, and an exponent quoted
+ * without its fit quality is exactly the kind of number this harness exists to
+ * distrust.
+ */
+function fitExponent(points: ReadonlyArray<ScalingPoint>): { exponent: number; rSquared: number } {
+  const usable = points.filter((p) => p.ms > 0 && p.n > 0);
+  if (usable.length < 3) return { exponent: NaN, rSquared: NaN };
+
+  const xs = usable.map((p) => Math.log(p.n));
+  const ys = usable.map((p) => Math.log(p.ms));
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i]! - mx;
+    const dy = ys[i]! - my;
+    sxy += dx * dy;
+    sxx += dx * dx;
+    syy += dy * dy;
+  }
+  if (sxx === 0) return { exponent: NaN, rSquared: NaN };
+
+  const slope = sxy / sxx;
+  // A perfectly flat series has no variance to explain; the fit is vacuously
+  // exact rather than undefined.
+  const rSquared = syy === 0 ? 1 : (sxy * sxy) / (sxx * syy);
+  return { exponent: slope, rSquared };
+}
+
+function measureSeries(
+  subject: Subject,
+  axis: "depth" | "width",
+  sizes: ReadonlyArray<number>,
+  build: (n: number) => unknown,
+): ScalingSeries {
+  const points: ScalingPoint[] = [];
+  let failedAt: number | undefined;
+
+  for (const n of sizes) {
+    let outputLength: number;
+    try {
+      // An untimed call on its own throwaway value: it warms the JIT for this
+      // shape and confirms the subject can handle the size, without touching
+      // any input that is about to be timed.
+      outputLength = subject.run(build(n)).length;
+    } catch {
+      failedAt = n;
+      break;
+    }
+    // Built up front, outside the clock, and distinct from each other so an
+    // identity-memoizing subject cannot answer from cache.
+    const inputs = Array.from({ length: REPS }, () => build(n));
+    points.push({ n, ms: timeMedian((v) => void subject.run(v), inputs), outputLength });
+  }
+
+  return { axis, points, ...fitExponent(points), ...(failedAt ? { failedAt } : {}) };
+}
+
+/**
+ * Sizes stay well below the depth at which recursive subjects die (the shallowest
+ * measured is around 1,500), because a series that kills half the field measures
+ * nothing comparable. A subject that fails anyway records `failedAt` and is
+ * fitted on the points it did complete.
+ */
+export const DEPTH_SIZES = [64, 128, 256, 512, 1024] as const;
+export const WIDTH_SIZES = [500, 1000, 2000, 4000, 8000] as const;
+
+export function runScaling(subject: Subject): ScalingResult {
+  return {
+    subject: subject.name,
+    series: [
+      measureSeries(subject, "depth", DEPTH_SIZES, deepInput),
+      measureSeries(subject, "width", WIDTH_SIZES, wideInput),
+    ],
+  };
 }

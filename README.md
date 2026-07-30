@@ -34,6 +34,7 @@ nothing is pinned, and it is not the companion of any one implementation.
 | `determinism` | Do two identical values produce different output? |
 | `coverage` | What does it actually do with each type? (matrix, unjudged) |
 | `depth` | How deep can the input nest before it fails? |
+| `scaling` | How does cost grow with size? (linear, or quadratic and an outage) |
 
 ```bash
 serializer-conformance                          # conformance, collisions, determinism
@@ -100,6 +101,34 @@ magnitude. `unbounded` means the probe ceiling was reached without failing,
 which is the signature of an iterative kernel; it is drawn running off the axis
 rather than as a longer bar, because the absence of a limit is not a bigger
 number.
+
+## Scaling: crashing is not the only way to fail
+
+The depth suite answers *does it crash*, which is half the availability
+question. A canonicalizer that survives a deep document by taking thirty seconds
+over it has moved the denial of service from the call stack to the clock. Same
+outage, harder to diagnose, because nothing in the logs says the word "error".
+
+`scaling` fits log(time) against log(size), so the number it reports is an
+exponent: 1 is linear, 2 is quadratic. It travels with an r², because a
+confident exponent from a bad fit is exactly the kind of number this tool exists
+to distrust, and a bar whose fit is poor is drawn hollow rather than solid.
+
+![Growth exponent by depth, one bar per implementation, with reference lines at linear and quadratic](https://raw.githubusercontent.com/destbreso/serializer-conformance/main/docs/scaling-depth.svg)
+
+This measures the *shape*, deliberately, and not a winner. Absolute throughput
+across these subjects would compare unlike things: a hasher does strictly more
+work than a serializer because it also hashes, so an ops/sec ranking would look
+authoritative and mean very little. The exponent is comparable in a way the
+constant is not.
+
+Two details that turned out to matter. Every timed repetition gets its own
+freshly built input, because the first version reused one and reported
+`stable-hash` at exponent 0.00 with a perfect fit: it memoizes on object
+identity, so the warm-up call filled a `WeakMap` and the suite spent its time
+measuring the cache. And output length is reported alongside the timings,
+because it is exactly reproducible where a duration never is, and a canonical
+form twice as long costs twice as much in whatever store it is written to.
 
 ## Determinism, the failure no collision test can see
 

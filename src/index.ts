@@ -30,6 +30,9 @@ export {
   runCoverage,
   runDepth,
   runDeterminism,
+  runScaling,
+  DEPTH_SIZES,
+  WIDTH_SIZES,
 } from "./suites.js";
 export {
   reportCollisions,
@@ -38,8 +41,9 @@ export {
   reportDepth,
   reportDeterminism,
   reportHeader,
+  reportScaling,
 } from "./report.js";
-export { collisionChart, depthChart } from "./charts.js";
+export { CHART_PALETTE, collisionChart, depthChart, scalingChart } from "./charts.js";
 export type {
   Case,
   CaseTag,
@@ -49,6 +53,9 @@ export type {
   CoverageResult,
   DepthResult,
   Outcome,
+  ScalingPoint,
+  ScalingResult,
+  ScalingSeries,
   Subject,
   SubjectKind,
 } from "./types.js";
