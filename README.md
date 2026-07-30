@@ -123,11 +123,17 @@ Loaded dynamically, skipped if absent, never pinned:
 
 `canonicalize`, `json-canonicalize`, `safe-stable-stringify`,
 `fast-json-stable-stringify`, `ohash` (both `serialize` and `hash`),
-`stable-hash`, `object-hash`.
+`stable-hash`, `object-hash`, `impronta` (both `jcs` and `imprint`).
 
 Adapters are deliberately thin: call each library the way its README says and
 record what comes back, with no normalization and no repair. A harness that
 quietly fixes up a subject's answer is measuring itself.
+
+A disclosure worth making plainly: `impronta` is written by the author of this
+harness. The harness was written first, against the seven packages that are not
+his, to answer a question whose answer he did not yet know. It bundles no
+versions and measures only what you have installed, so the way to check any
+number in this README is to install the subjects you care about and run it.
 
 ## Install
 

@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 0.1.1
+
+- Adapters for `impronta` (both `jcs` and `imprint` modes), loaded dynamically
+  and skipped if absent like every other subject, and listed last so the table
+  does not read as a leaderboard with the author's own package on top.
+- Conformance is now reported against what a subject *claims*. A "claims JCS"
+  column, `n/a` instead of a failure for subjects that never promised RFC 8785,
+  and per-vector diffs printed only for those that did. Previously a deliberate
+  non-JCS mode and a genuine conformance failure rendered as the same cell, and
+  two popular stringifiers that pass all six vectors without claiming to were
+  flattened the same way.
+
 ## 0.1.0
 
 First release.
