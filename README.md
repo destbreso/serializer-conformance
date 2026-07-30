@@ -41,6 +41,7 @@ serializer-conformance all                      # everything
 serializer-conformance coverage depth           # pick suites
 serializer-conformance --only canonicalize,ohash.hash
 serializer-conformance --list                   # what did it find installed
+serializer-conformance all --svg ./docs         # also write the charts below
 ```
 
 Output is markdown, so it pastes into an issue or a pull request and diffs
@@ -65,6 +66,32 @@ Running the harness against the popular packages turns up, among others:
 Refusing a value is **not** counted as a failure. A library entitled to say "I
 do not model this type" and saying so loudly is doing the honest thing; the
 harness reports `both-threw` and moves on. Only silence is penalized.
+
+![Collision grid: ten probes against every implementation found installed](https://raw.githubusercontent.com/destbreso/serializer-conformance/main/docs/collisions.svg)
+
+The finding is not any single cell, it is the shape of the field. Regenerate it
+yourself against whatever you have installed:
+
+```bash
+npx serializer-conformance collisions depth --svg ./docs
+```
+
+## Depth: everything in the field is recursive
+
+Every implementation measured so far walks the value graph with the call stack,
+so every one of them has a ceiling somewhere in the low thousands of levels.
+That is a curiosity for most libraries and a denial of service for this kind,
+because canonicalizing untrusted input is the job description: a webhook body, an
+uploaded document, a message off a queue. A few dozen kilobytes of nested JSON
+parses without complaint and then takes down the handler that fingerprints it.
+
+![Nesting depth before failure, by implementation](https://raw.githubusercontent.com/destbreso/serializer-conformance/main/docs/depth.svg)
+
+Stack limits move between runs and machines, so read those as orders of
+magnitude. `unbounded` means the probe ceiling was reached without failing,
+which is the signature of an iterative kernel; it is drawn running off the axis
+rather than as a longer bar, because the absence of a limit is not a bigger
+number.
 
 ## Determinism, the failure no collision test can see
 

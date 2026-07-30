@@ -1,6 +1,6 @@
 {
   "name": "serializer-conformance",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A conformance and collision harness for JavaScript value serializers: JSON canonicalizers and structural hashers. Byte-exact RFC 8785 (JCS) conformance against the official test vectors, plus the checks that matter more in practice: a collision detector for distinct inputs that produce identical output, a determinism check that catches implementations keyed on object identity rather than content, a type-coverage matrix over the whole JavaScript value graph, and a nesting-depth probe. Adapters for the popular npm packages, and bring-your-own.",
   "author": {
     "name": "David Estevez",
@@ -79,5 +79,13 @@
   "dependencies": {
     "citty": "^0.2.2",
     "picocolors": "^1.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/destbreso/serializer-conformance.git"
+  },
+  "homepage": "https://github.com/destbreso/serializer-conformance#readme",
+  "bugs": {
+    "url": "https://github.com/destbreso/serializer-conformance/issues"
   }
 }

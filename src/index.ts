@@ -39,6 +39,7 @@ export {
   reportDeterminism,
   reportHeader,
 } from "./report.js";
+export { collisionChart, depthChart } from "./charts.js";
 export type {
   Case,
   CaseTag,

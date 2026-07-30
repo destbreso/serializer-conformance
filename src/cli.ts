@@ -10,10 +10,14 @@
 // a TTY, so piping to a file or a pull request produces clean text with no
 // escape codes in it.
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { defineCommand, runMain } from "citty";
 import pc from "picocolors";
 
 import { builtinSubjects } from "./adapters.js";
+import { collisionChart, depthChart } from "./charts.js";
 import {
   runCollisions,
   runConformance,
@@ -58,7 +62,7 @@ function progress(message: string): void {
 const main = defineCommand({
   meta: {
     name: "serializer-conformance",
-    version: "0.1.0",
+    version: "0.2.0",
     description:
       "Conformance and collision harness for JavaScript value serializers: JSON canonicalizers and " +
       "structural hashers. Measures whatever supported packages are installed: nothing is bundled, " +
@@ -78,11 +82,20 @@ const main = defineCommand({
       type: "boolean",
       description: "list the implementations found and exit",
     },
+    svg: {
+      type: "string",
+      description:
+        "also write SVG charts for the collision and depth suites into this directory",
+    },
   },
-  async run({ args, rawArgs }) {
-    // citty binds a single positional to `args.suites`; the rest arrive in
-    // rawArgs. Take every non-flag token so `serializer-conformance coverage depth` works.
-    const positional = rawArgs.filter((a) => !a.startsWith("-"));
+  async run({ args }) {
+    // citty binds only the first positional to `args.suites`, so multi-suite
+    // invocations need the full list. It is `args._`, NOT a hand-filter over
+    // rawArgs: an earlier version took every token not starting with "-", which
+    // also swept up the *values* of string flags, so `--only impronta.jcs` and
+    // `--svg ./charts` were both read as suite names and rejected. Twice now
+    // this CLI has been bitten by parsing argv itself. It does not do that.
+    const positional = (args._ ?? []) as string[];
 
     const known = new Set<string>(SUITES);
     const unknown = positional.filter((p) => p !== "all" && !known.has(p));
@@ -125,6 +138,16 @@ const main = defineCommand({
       return;
     }
 
+    const svgDir = typeof args.svg === "string" && args.svg ? args.svg : null;
+    // Charts go to stderr-announced files, never into the report, so a piped
+    // report stays plain text.
+    const writeChart = (file: string, contents: string) => {
+      const path = join(svgDir!, file);
+      writeFileSync(path, contents, "utf8");
+      process.stderr.write(note(`  wrote ${path}\n`));
+    };
+    if (svgDir) mkdirSync(svgDir, { recursive: true });
+
     let out = reportHeader(subjects, missing);
 
     if (suites.includes("conformance")) {
@@ -145,6 +168,7 @@ const main = defineCommand({
       const results = subjects.map(runCollisions);
       collisionCount = results.reduce((n, r) => n + r.collisions, 0);
       out += reportCollisions(results) + "\n";
+      if (svgDir) writeChart("collisions.svg", collisionChart(results));
     }
     if (suites.includes("determinism")) {
       progress("checking determinism");
@@ -156,7 +180,9 @@ const main = defineCommand({
     }
     if (suites.includes("depth")) {
       progress("probing nesting depth (allocates deep objects, this one is slow)");
-      out += reportDepth(subjects.map((s) => runDepth(s))) + "\n";
+      const results = subjects.map((s) => runDepth(s));
+      out += reportDepth(results) + "\n";
+      if (svgDir) writeChart("depth.svg", depthChart(results));
     }
 
     process.stdout.write(colourize(out));
