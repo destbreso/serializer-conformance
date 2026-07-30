@@ -12,6 +12,10 @@ All notable changes to this project are documented here.
   library, and return strings: the CLI owns the filesystem.
   The other three suites deliberately get no chart. Conformance is six booleans,
   determinism is one integer, and coverage has to be read rather than scanned.
+- **`docs/REPORT.md`**: a committed full run of every suite against the
+  supported packages, with no implementation by this harness's author installed.
+  The instrument's own reference output describes the field rather than the
+  thing its author also publishes.
 - **Fixed: `--only` and `--svg` values were parsed as suite names.** The CLI
   took every argv token not starting with `-` as a positional, which swept up
   the values of string flags, so `--only impronta.jcs` exited with "unknown

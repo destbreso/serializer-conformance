@@ -37,6 +37,13 @@ function esc(s: string): string {
 
 const FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
+/**
+ * Advance width of monospace text. 0.6em per character is the standard for the
+ * families in FONT, and being approximate is fine because every use of it adds
+ * space rather than removing it.
+ */
+const textPx = (s: string, fontSize: number) => s.length * fontSize * 0.6;
+
 /** Light values are the baseline, written directly onto every element. */
 const LIGHT = {
   fg: "#1c1f26",
@@ -120,27 +127,35 @@ export function collisionChart(results: ReadonlyArray<CollisionResult>): string 
   const cols = results.length;
   const rows = COLLISION_PROBES.length;
 
+  const TITLE = "Collisions: distinct inputs that produce identical output";
+  const SUBTITLE =
+    "Each cell is one probe against one implementation. Red is a silent wrong answer, not a crash.";
+
   // The column headers are rotated, so the space they need depends on how long
   // the subject names are. Fixed header space clipped the last column and drove
   // the longest label up through the title, so both are derived from the actual
-  // names. 0.6em per character is the standard monospace advance width.
+  // names.
   const ANGLE_DEG = 55;
   const angle = (ANGLE_DEG * Math.PI) / 180;
-  const labelPx = Math.max(0, ...results.map((r) => r.subject.length)) * 11 * 0.6;
+  const labelPx = textPx("x".repeat(Math.max(0, ...results.map((r) => r.subject.length))), 11);
   const headerRise = Math.ceil(labelPx * Math.sin(angle));
   const headerRun = Math.ceil(labelPx * Math.cos(angle));
 
   const HEAD_H = TITLE_H + headerRise + 12;
   const rightPad = Math.max(PAD, headerRun + 10);
-  const width = PAD + LABEL_W + cols * CELL + rightPad;
+  // The canvas has to clear the header text as well as the grid. Sizing on the
+  // grid alone clipped the subtitle whenever few subjects were installed.
+  const gridWidth = PAD + LABEL_W + cols * CELL + rightPad;
+  const textWidth = PAD + Math.max(textPx(TITLE, 14), textPx(SUBTITLE, 11)) + PAD;
+  const width = Math.ceil(Math.max(gridWidth, textWidth));
   const height = HEAD_H + rows * ROW_H + 70;
 
   const parts: string[] = [];
   parts.push(
-    `<text x="${PAD}" y="24" class="f-fg" fill="${LIGHT.fg}" font-size="14" font-weight="700">Collisions: distinct inputs that produce identical output</text>`,
+    `<text x="${PAD}" y="24" class="f-fg" fill="${LIGHT.fg}" font-size="14" font-weight="700">${TITLE}</text>`,
   );
   parts.push(
-    `<text x="${PAD}" y="42" class="f-muted" fill="${LIGHT.muted}" font-size="11">Each cell is one probe against one implementation. Red is a silent wrong answer, not a crash.</text>`,
+    `<text x="${PAD}" y="42" class="f-muted" fill="${LIGHT.muted}" font-size="11">${SUBTITLE}</text>`,
   );
 
   // Column headers, rotated so the grid stays narrow enough to read on a phone.
@@ -234,7 +249,13 @@ export function depthChart(results: ReadonlyArray<DepthResult>): string {
   const ROW_H = 30;
   const HEAD_H = 66;
 
-  const width = PAD + LABEL_W + BAR_W + 100;
+  const TITLE = "Nesting depth before failure";
+  const SUBTITLE =
+    "Recursive kernels die in the low thousands. Stack limits vary by run, so read these as orders of magnitude.";
+
+  const barsWidth = PAD + LABEL_W + BAR_W + 100;
+  const textWidth = PAD + Math.max(textPx(TITLE, 14), textPx(SUBTITLE, 11)) + PAD;
+  const width = Math.ceil(Math.max(barsWidth, textWidth));
   const height = HEAD_H + results.length * ROW_H + 44;
 
   const finite = results.map((r) => r.maxDepth).filter((d) => Number.isFinite(d));
@@ -246,10 +267,10 @@ export function depthChart(results: ReadonlyArray<DepthResult>): string {
 
   const parts: string[] = [];
   parts.push(
-    `<text x="${PAD}" y="24" class="f-fg" fill="${LIGHT.fg}" font-size="14" font-weight="700">Nesting depth before failure</text>`,
+    `<text x="${PAD}" y="24" class="f-fg" fill="${LIGHT.fg}" font-size="14" font-weight="700">${TITLE}</text>`,
   );
   parts.push(
-    `<text x="${PAD}" y="42" class="f-muted" fill="${LIGHT.muted}" font-size="11">Recursive kernels die in the low thousands. Stack limits vary by run, so read these as orders of magnitude.</text>`,
+    `<text x="${PAD}" y="42" class="f-muted" fill="${LIGHT.muted}" font-size="11">${SUBTITLE}</text>`,
   );
 
   const axisBottom = HEAD_H + results.length * ROW_H;

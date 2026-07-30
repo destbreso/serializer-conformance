@@ -111,6 +111,23 @@ describe("collisionChart", () => {
     assertSelfContained(out);
   });
 
+  it("is always wide enough for its own header text", () => {
+    // With few subjects the grid is narrower than the subtitle, which used to
+    // run off the right edge. The canvas is sized on whichever is wider.
+    for (const n of [1, 2, 3, 8, 10]) {
+      const out = collisionChart(
+        Array.from({ length: n }, (_, i) => collisionsFor(`s${i}`, [])),
+      );
+      const width = Number(/width="(\d+)"/.exec(out)![1]);
+      const longest = Math.max(
+        ...[...out.matchAll(/font-size="(11|14)"[^>]*>([^<]+)</g)].map((m) =>
+          (m[2] ?? "").length * Number(m[1]) * 0.6,
+        ),
+      );
+      expect(width, `n=${n}`).toBeGreaterThanOrEqual(longest);
+    }
+  });
+
   it("grows the canvas to fit rotated headers instead of clipping them", () => {
     // Fixed header space clipped the rightmost column and pushed the longest
     // label up through the title. Both dimensions must track the longest name.
@@ -118,8 +135,11 @@ describe("collisionChart", () => {
       w: Number(/width="(\d+)"/.exec(out)![1]),
       h: Number(/height="(\d+)"/.exec(out)![1]),
     });
-    const short = dims(collisionChart([collisionsFor("ab", [])]));
-    const long = dims(collisionChart([collisionsFor("a".repeat(40), [])]));
+    // Enough subjects that the grid, not the header text, sets the width.
+    const grid = (name: string) =>
+      dims(collisionChart(Array.from({ length: 10 }, () => collisionsFor(name, []))));
+    const short = grid("ab");
+    const long = grid("a".repeat(40));
 
     expect(long.w).toBeGreaterThan(short.w);
     expect(long.h).toBeGreaterThan(short.h);

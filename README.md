@@ -67,13 +67,21 @@ Refusing a value is **not** counted as a failure. A library entitled to say "I
 do not model this type" and saying so loudly is doing the honest thing; the
 harness reports `both-threw` and moves on. Only silence is penalized.
 
-![Collision grid: ten probes against every implementation found installed](https://raw.githubusercontent.com/destbreso/serializer-conformance/main/docs/collisions.svg)
+![Collision grid: ten probes against eight adapters over seven packages](https://raw.githubusercontent.com/destbreso/serializer-conformance/main/docs/collisions.svg)
 
-The finding is not any single cell, it is the shape of the field. Regenerate it
-yourself against whatever you have installed:
+The finding is not any single cell, it is the shape of the field.
+
+This chart, and the full run in [docs/REPORT.md](docs/REPORT.md), are measured
+with **no implementation by this harness's author installed**. `impronta` has
+adapters here and is deliberately absent from the harness's own documentation:
+an instrument's reference output should describe the field, not the thing its
+author also sells. Install it if you want it measured, exactly like any other
+subject.
+
+Regenerate all of it against whatever you have:
 
 ```bash
-npx serializer-conformance collisions depth --svg ./docs
+npx serializer-conformance all --svg ./docs > ./docs/REPORT.md
 ```
 
 ## Depth: everything in the field is recursive
@@ -161,6 +169,12 @@ harness. The harness was written first, against the seven packages that are not
 his, to answer a question whose answer he did not yet know. It bundles no
 versions and measures only what you have installed, so the way to check any
 number in this README is to install the subjects you care about and run it.
+
+For the same reason, nothing published here is measured with `impronta`
+installed. The numbers and charts in this repository are the field on its own.
+If you want to see how it places against the rest, install it and run the
+harness, or read the comparison in that package's own documentation where the
+conflict of interest is where it belongs.
 
 ## Install
 
