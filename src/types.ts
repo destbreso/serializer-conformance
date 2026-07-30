@@ -87,6 +87,8 @@ export interface CollisionProbe {
 
 export interface ConformanceResult {
   subject: string;
+  /** Whether the subject actually claims RFC 8785, which decides how to read a failure. */
+  kind: SubjectKind;
   /** One entry per official RFC 8785 vector. */
   vectors: ReadonlyArray<{
     name: string;

@@ -27,17 +27,27 @@ function show(s: string, max = 46): string {
 }
 
 export function reportConformance(results: ReadonlyArray<ConformanceResult>): string {
-  const rows = results.map((r) => [
-    r.subject,
-    `${r.passed}/${r.total}`,
-    r.passed === r.total ? "conformant" : r.vectors.filter((v) => !v.pass).map((v) => v.name).join(", "),
-  ]);
+  const rows = results.map((r) => {
+    const claims = r.kind === "jcs";
+    const verdict = r.passed === r.total
+      ? "conformant"
+      : claims
+        ? `FAILS: ${r.vectors.filter((v) => !v.pass).map((v) => v.name).join(", ")}`
+        : "n/a, makes no JCS claim";
+    return [r.subject, claims ? "yes" : "no", `${r.passed}/${r.total}`, verdict];
+  });
 
   let out = "## RFC 8785 conformance\n\n";
   out += "Byte-exact, against the official vectors from the reference implementation.\n\n";
-  out += table(["implementation", "vectors", "result"], rows) + "\n";
+  out += "Only implementations that **claim** JCS are held to this. The others are run\n";
+  out += "anyway and their score shown, because a deterministic serializer that passes\n";
+  out += "all six without claiming to is worth knowing about, and a format that is\n";
+  out += "deliberately not JCS scoring zero is a description of what it is, not a fault.\n\n";
+  out += table(["implementation", "claims JCS", "vectors", "result"], rows) + "\n";
 
-  const failures = results.flatMap((r) =>
+  // Divergences are only shown for implementations that claim conformance:
+  // dumping six diffs for a format that never promised JCS is noise.
+  const failures = results.filter((r) => r.kind === "jcs").flatMap((r) =>
     r.vectors.filter((v) => !v.pass).map((v) => ({ subject: r.subject, v })),
   );
   if (failures.length) {

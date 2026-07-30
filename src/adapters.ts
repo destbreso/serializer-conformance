@@ -160,6 +160,33 @@ const SPECS: ReadonlyArray<AdapterSpec> = [
       return (v) => fn(v) as string;
     },
   },
+  // impronta is written by the author of this harness. It gets no special
+  // treatment: same dynamic load, same skip-if-absent, same thin adapter, same
+  // suites, listed last so the table does not read as a leaderboard with a
+  // favourite on top. A good score here is only worth something because the
+  // harness would report its collisions exactly as loudly as anyone else's.
+  {
+    pkg: "impronta",
+    name: "impronta.imprint",
+    kind: "serializer",
+    note: "extended mode: the whole JavaScript value graph, type-tagged and length-prefixed",
+    build: (mod) => {
+      const fn = mod.imprint ?? mod.default?.imprint;
+      return (v) => fn(v) as string;
+    },
+  },
+  {
+    pkg: "impronta",
+    name: "impronta.jcs",
+    kind: "jcs",
+    note:
+      "strict RFC 8785 mode: refuses what JSON cannot express, and inherits JSON's own conflations " +
+      "(a Date and its ISO string are the same JSON document, so they must collide here)",
+    build: (mod) => {
+      const fn = mod.jcs ?? mod.default?.jcs;
+      return (v) => fn(v) as string;
+    },
+  },
 ];
 
 /**

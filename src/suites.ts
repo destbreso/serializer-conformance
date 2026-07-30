@@ -59,6 +59,7 @@ export function runConformance(subject: Subject): ConformanceResult {
 
   return {
     subject: subject.name,
+    kind: subject.kind,
     vectors,
     passed: vectors.filter((v) => v.pass).length,
     total: vectors.length,
