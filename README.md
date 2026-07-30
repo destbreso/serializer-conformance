@@ -1,7 +1,13 @@
-# canon-arena
+# serializer-conformance
 
 A conformance and collision harness for JavaScript JSON canonicalizers and
 structural hashers.
+
+"Serializer" is meant broadly: anything that maps a JavaScript value to a
+string. A canonicalizer and a structural hasher are not interchangeable in use,
+but they make the same promise about *identity*, and that promise is what gets
+tested here. RFC 8785 conformance is one suite of five, and the least
+discriminating of them, because every popular canonicalizer already passes it.
 
 Every library in this space promises the same thing in different words: equal
 values produce equal output, different values do not. The first half is easy and
@@ -13,7 +19,7 @@ and each library invented its own answer for `Map`, `Set`, `TypedArray`,
 Those answers collide. This harness finds the collisions.
 
 ```bash
-npx canon-arena
+npx serializer-conformance
 ```
 
 It measures whatever supported packages are installed. Nothing is bundled,
@@ -30,11 +36,11 @@ nothing is pinned, and it is not the companion of any one implementation.
 | `depth` | How deep can the input nest before it fails? |
 
 ```bash
-canon-arena                          # conformance, collisions, determinism
-canon-arena all                      # everything
-canon-arena coverage depth           # pick suites
-canon-arena --only canonicalize,ohash.hash
-canon-arena --list                   # what did it find installed
+serializer-conformance                          # conformance, collisions, determinism
+serializer-conformance all                      # everything
+serializer-conformance coverage depth           # pick suites
+serializer-conformance --only canonicalize,ohash.hash
+serializer-conformance --list                   # what did it find installed
 ```
 
 Output is markdown, so it pastes into an issue or a pull request and diffs
@@ -78,7 +84,7 @@ notes, rather than calling it a bug.
 ## Bring your own
 
 ```ts
-import { defineSubject, runCollisions, runConformance, reportCollisions } from "canon-arena";
+import { defineSubject, runCollisions, runConformance, reportCollisions } from "serializer-conformance";
 import { canonicalize } from "./my-implementation.js";
 
 const mine = defineSubject({
@@ -126,7 +132,7 @@ quietly fixes up a subject's answer is measuring itself.
 ## Install
 
 ```bash
-npm i -D canon-arena
+npm i -D serializer-conformance
 ```
 
 Node 18+. Two dependencies, both zero-dep themselves: `citty` for argument

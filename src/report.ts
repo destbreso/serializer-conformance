@@ -138,7 +138,7 @@ export function reportCoverage(results: ReadonlyArray<CoverageResult>): string {
 }
 
 export function reportHeader(subjects: ReadonlyArray<Subject>, missing: ReadonlyArray<string>): string {
-  let out = "# canon-arena report\n\n";
+  let out = "# serializer-conformance report\n\n";
   out += table(
     ["implementation", "kind", "source"],
     subjects.map((s) => [s.name, s.kind, s.source ?? ""]),

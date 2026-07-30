@@ -5,4 +5,4 @@ coverage/
 .DS_Store
 
 # CLI output
-canon-arena-report/
+serializer-conformance-report/

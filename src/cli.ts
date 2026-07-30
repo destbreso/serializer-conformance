@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// canon-arena CLI.
+// serializer-conformance CLI.
 //
 // Argument handling is citty's job, not ours. The first draft parsed argv by
 // hand and silently swallowed the first positional whenever `--only` was
-// absent, so `canon-arena conformance` quietly ran the default suites instead.
+// absent, so `serializer-conformance conformance` quietly ran the default suites instead.
 // That class of bug is exactly what a parser library is for.
 //
 // The report itself stays plain markdown. Colour is applied only when stdout is
@@ -57,11 +57,12 @@ function progress(message: string): void {
 
 const main = defineCommand({
   meta: {
-    name: "canon-arena",
+    name: "serializer-conformance",
     version: "0.1.0",
     description:
-      "Conformance and collision harness for JavaScript JSON canonicalizers and structural hashers. " +
-      "Measures whatever supported packages are installed: nothing is bundled, nothing is pinned.",
+      "Conformance and collision harness for JavaScript value serializers: JSON canonicalizers and " +
+      "structural hashers. Measures whatever supported packages are installed: nothing is bundled, " +
+      "nothing is pinned.",
   },
   args: {
     suites: {
@@ -80,7 +81,7 @@ const main = defineCommand({
   },
   async run({ args, rawArgs }) {
     // citty binds a single positional to `args.suites`; the rest arrive in
-    // rawArgs. Take every non-flag token so `canon-arena coverage depth` works.
+    // rawArgs. Take every non-flag token so `serializer-conformance coverage depth` works.
     const positional = rawArgs.filter((a) => !a.startsWith("-"));
 
     const known = new Set<string>(SUITES);

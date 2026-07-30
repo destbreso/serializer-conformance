@@ -1,4 +1,4 @@
-// canon-arena: a conformance and collision harness for JavaScript JSON
+// serializer-conformance: a conformance and collision harness for JavaScript JSON
 // canonicalizers and structural hashers.
 //
 // The premise. Every library in this space promises the same thing in

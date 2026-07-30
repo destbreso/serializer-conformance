@@ -1,7 +1,7 @@
 {
-  "name": "canon-arena",
+  "name": "serializer-conformance",
   "version": "0.1.0",
-  "description": "A conformance and collision harness for JavaScript JSON canonicalizers and structural hashers: byte-exact RFC 8785 (JCS) conformance against the official test vectors, a differential type-coverage matrix over the whole JavaScript value graph, and a collision detector that catches distinct inputs producing identical output. Adapters for the popular npm packages, and bring-your-own.",
+  "description": "A conformance and collision harness for JavaScript value serializers: JSON canonicalizers and structural hashers. Byte-exact RFC 8785 (JCS) conformance against the official test vectors, plus the checks that matter more in practice: a collision detector for distinct inputs that produce identical output, a determinism check that catches implementations keyed on object identity rather than content, a type-coverage matrix over the whole JavaScript value graph, and a nesting-depth probe. Adapters for the popular npm packages, and bring-your-own.",
   "author": {
     "name": "David Estevez",
     "email": "dev.destbreso@gmail.com"
@@ -9,7 +9,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "canon-arena": "./dist/cli.js"
+    "serializer-conformance": "./dist/cli.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -55,7 +55,13 @@
     "deterministic",
     "stable-stringify",
     "cli",
-    "typescript"
+    "typescript",
+    "json-canonicalization",
+    "canonicalize",
+    "test-suite",
+    "serializer",
+    "stringify",
+    "identity"
   ],
   "devDependencies": {
     "@types/node": "^20.11.0",
