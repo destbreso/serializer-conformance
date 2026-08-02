@@ -3,20 +3,85 @@
 A conformance and collision harness for JavaScript JSON canonicalizers and
 structural hashers.
 
-"Serializer" is meant broadly: anything that maps a JavaScript value to a
+## What this is
+
+If you have not had to choose one of these before, here is the situation it
+exists for.
+
+You have a JavaScript value and you need a short string that stands for it: a
+cache key, a deduplication key, an ETag, the id a document is stored under, the
+bytes a signature is computed over. Two equal values must produce the same
+string, or the cache never hits. Two different values must produce different
+strings, or the cache hands back somebody else's answer and the signature
+verifies over data that was not signed.
+
+`JSON.stringify` cannot do that job. `{a:1,b:2}` and `{b:2,a:1}` are the same
+value and stringify to different text, because the output follows insertion
+order. So the field built **canonicalizers**: a fixed rule for key order, number
+formatting and string escaping, so that one value has exactly one written form.
+RFC 8785 (JCS) is that rule written down as a standard, with official vectors to
+check an implementation against. A **structural hasher** makes the same promise
+and hands back a fixed-length digest instead of a string, and usually accepts
+more of JavaScript than JSON can express: a `Map`, a `Set`, a `Uint8Array`, a
+`BigInt`, a class instance.
+
+"Serializer" is meant broadly here: anything that maps a JavaScript value to a
 string. A canonicalizer and a structural hasher are not interchangeable in use,
 but they make the same promise about *identity*, and that promise is what gets
-tested here. RFC 8785 conformance is one suite of five, and the least
-discriminating of them, because every popular canonicalizer already passes it.
+tested here.
 
-Every library in this space promises the same thing in different words: equal
-values produce equal output, different values do not. The first half is easy and
-everyone gets it right. The second half is where they quietly diverge, because
-the JSON subset cannot express most of what a JavaScript program actually holds,
-and each library invented its own answer for `Map`, `Set`, `TypedArray`,
-`BigInt` and class instances.
+Every library in this space states it in different words: equal values produce
+equal output, different values do not. The first half is easy and everyone gets
+it right. The second half is where they quietly diverge, because the JSON subset
+cannot express most of what a JavaScript program actually holds, and each
+library invented its own answer for `Map`, `Set`, `TypedArray`, `BigInt` and
+class instances.
 
-Those answers collide. This harness finds the collisions.
+Those answers collide, and a collision is invisible from the outside. Nothing
+throws. Every README states the promise and none of them states which values
+break it, so the divergence surfaces much later, as a key that matched when it
+should not have. Seven of these packages have adapters here, and there is no way
+to choose between them by reading.
+
+**A harness is the instrument, not the finding.** This package holds the inputs,
+the probes, the official vectors and the rules about what counts as a failure,
+and runs them against whichever implementations you have installed. It has no
+opinion about which one should win: it produces the table and you read it.
+Nothing is bundled and nothing is pinned, because the thing worth measuring is
+the version you actually have.
+
+It also has to stay neutral about one package in particular. `impronta` is a
+canonical serializer I wrote, and it enters here the way everything else does:
+same dynamic load, same skip-if-absent, same thin adapter, same suites, listed
+last so the table does not read as a leaderboard with a favourite on top. It is
+deliberately **not installed** when the charts and the report committed to this
+repository are generated, because an instrument's reference output should
+describe the field rather than the thing its author also publishes. Install it
+and it is measured like any other subject, collisions included.
+
+RFC 8785 conformance is one suite of six, and the least discriminating of them,
+because every popular canonicalizer already passes it. The other five are where
+these libraries come apart.
+
+## Install
+
+```bash
+npm i -D serializer-conformance
+```
+
+Node 18+. Two dependencies, both zero-dep themselves: `citty` for argument
+parsing and `picocolors` for TTY colour.
+
+The implementations themselves are not dependencies of this package. Install the
+ones you want measured, in any subset; an adapter whose package does not resolve
+reports itself absent rather than failing the run.
+
+```bash
+npm i -D canonicalize json-canonicalize safe-stable-stringify \
+  fast-json-stable-stringify ohash stable-hash object-hash
+```
+
+## Use
 
 ```bash
 npx serializer-conformance
@@ -25,7 +90,7 @@ npx serializer-conformance
 It measures whatever supported packages are installed. Nothing is bundled,
 nothing is pinned, and it is not the companion of any one implementation.
 
-## What it measures
+Six suites, each answering one question and refusing to answer any other:
 
 | Suite | Question |
 |---|---|
@@ -47,8 +112,54 @@ serializer-conformance all --svg ./docs         # also write the charts below
 
 Output is markdown, so it pastes into an issue or a pull request and diffs
 cleanly when you re-run it against new versions. Colour is applied only when
-stdout is a TTY. The exit code is `1` if any collision was found, so it works as
-a CI gate on your own implementation.
+stdout is a TTY. The exit code is `1` if any collision was found, so a scripted
+run fails rather than printing a table nobody reads.
+
+## Where this earns its place
+
+The shape to look for is always the same: **a value in memory becomes an
+identifier, and the identifier outlives the value.** Once it has been written to
+a cache, a store, a log line or a signature, nothing downstream can tell that two
+different values were folded into one. The moment to find out is before the
+library is chosen, and that is what each of these situations has in common.
+
+**Choosing an implementation for content addressing or deduplication.** You are
+storing documents under a key derived from their content, or collapsing
+duplicates, or handing the key out as an ETag. Which library is right depends
+entirely on which types your values actually contain, and the coverage matrix and
+the collision grid answer exactly that question. If your documents carry binary,
+`typed-array-vs-index-object` is the row that decides it. If they carry a `Date`,
+`date-vs-string` is. If they carry neither, the field is much closer together
+than its READMEs suggest.
+
+**Auditing a scheme that says "canonicalize, then sign".** JCS exists so that two
+parties serializing the same document independently produce the same bytes, and
+that property is worth exactly as much as the byte-exactness of both
+implementations. The conformance suite runs the official vectors rather than
+trusting the claim, and one of the six separates implementations that sort keys
+correctly from implementations that sort them plausibly.
+
+**Canonicalizing input that arrived from outside.** A webhook body, an uploaded
+document, a message off a queue. Here the question is not what the library
+produces but whether the handler comes back, so the `depth` and `scaling` suites
+are the ones to read: a recursive kernel has a ceiling an attacker can reach with
+a few dozen kilobytes, and a superlinear one has a ceiling they can reach with
+patience.
+
+**A cache key built from an options bag.** Build tools, resolvers and memoized
+loaders key on a config object, and config objects accumulate `Set`s, `Map`s,
+`RegExp`s and class instances over time. Start with the `determinism` suite,
+because a library keyed on object identity gives you a cache that never hits and
+never says why.
+
+**Reviewing a dependency upgrade.** The report is markdown, so a run committed
+next to the lockfile diffs cleanly against the next one. A library that changes
+how it treats one type has changed every key you have already stored, and that
+is otherwise an invisible release note.
+
+**Building one of these yourself.** `defineSubject` puts your implementation
+through the same suites as everything else, from inside your own test file,
+before anything is published. See [Bring your own](#bring-your-own).
 
 ## Why collisions are the interesting axis
 
@@ -73,13 +184,8 @@ harness reports `both-threw` and moves on. Only silence is penalized.
 The finding is not any single cell, it is the shape of the field.
 
 This chart, and the full run in [docs/REPORT.md](docs/REPORT.md), are measured
-with **no implementation by this harness's author installed**. `impronta` has
-adapters here and is deliberately absent from the harness's own documentation:
-an instrument's reference output should describe the field, not the thing its
-author also sells. Install it if you want it measured, exactly like any other
-subject.
-
-Regenerate all of it against whatever you have:
+with **no implementation by this harness's author installed**, for the reason
+given above. Regenerate all of it against whatever you have:
 
 ```bash
 npx serializer-conformance all --svg ./docs > ./docs/REPORT.md
@@ -88,9 +194,9 @@ npx serializer-conformance all --svg ./docs > ./docs/REPORT.md
 ## Depth: everything in the field is recursive
 
 Every implementation measured so far walks the value graph with the call stack,
-so every one of them has a ceiling somewhere in the low thousands of levels.
-That is a curiosity for most libraries and a denial of service for this kind,
-because canonicalizing untrusted input is the job description: a webhook body, an
+so every one of them has a ceiling somewhere in the thousands of levels. That is
+a curiosity for most libraries and a denial of service for this kind, because
+canonicalizing untrusted input is the job description: a webhook body, an
 uploaded document, a message off a queue. A few dozen kilobytes of nested JSON
 parses without complaint and then takes down the handler that fingerprints it.
 
@@ -144,6 +250,48 @@ context it was written for (framework dependency keys inside one process, where
 referential identity *is* the intended semantics) and a landmine anywhere near
 content addressing. The harness reports it as a measurement and says so in the
 notes, rather than calling it a bug.
+
+## When not to use this
+
+Both ends, because a tool that only names where it wins is advertising.
+
+**Your values are plain JSON and stay that way.** If everything you canonicalize
+came out of `JSON.parse`, most of the probes here cannot fire: there is no `Map`
+to lose, no `Uint8Array` to flatten, no class instance to strip. Conformance will
+not separate the field for you either, since four of the five non-digest subjects
+in the published run pass all six vectors and two of those never claimed to.
+Pick on maintenance, size and API surface, and move on.
+
+**You want to know which library is fastest.** The `scaling` suite reports an
+exponent on purpose and refuses to rank absolute throughput, because a hasher
+does strictly more work than a serializer and an ops/sec table across the two
+would look authoritative and mean very little. If you need a throughput number,
+you need it for your own payloads anyway, measured with a benchmark runner built
+for that job.
+
+**You need cross-language conformance.** This loads npm packages into Node. If
+the question is whether your Go, Rust or Java implementation agrees with the
+JavaScript one, take the vectors to their source
+([cyberphone/json-canonicalization](https://github.com/cyberphone/json-canonicalization))
+and run them there. The vectors embedded here are those same files; the harness
+around them is not portable.
+
+**Your worry is the digest and not the structure.** Every collision reported here
+happens before hashing: two different values were already turned into the same
+string, and no hash function can undo that. If instead the question is whether
+the digest algorithm itself resists collisions, that is a question about the
+algorithm, and this measures nothing about it.
+
+**You want a general test suite for your own implementation.** This tests
+identity behaviour and only that. Your API, your options, your error messages,
+your streaming path and your memory use are all outside it, and a clean report
+here says nothing about any of them.
+
+**You want a recommendation.** There is not one. Several perfectly reasonable
+libraries collide on purpose for documented reasons, "correct" depends on
+whether you are doing JSON semantics or content addressing, and reading a row
+still requires knowing which types your own values contain. The harness narrows
+the question; it does not answer it.
 
 ## Bring your own
 
@@ -204,15 +352,6 @@ installed. The numbers and charts in this repository are the field on its own.
 If you want to see how it places against the rest, install it and run the
 harness, or read the comparison in that package's own documentation where the
 conflict of interest is where it belongs.
-
-## Install
-
-```bash
-npm i -D serializer-conformance
-```
-
-Node 18+. Two dependencies, both zero-dep themselves: `citty` for argument
-parsing and `picocolors` for TTY colour.
 
 ## License
 
